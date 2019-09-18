@@ -1,0 +1,17 @@
+coSeg<-function(ped,generation,genotype){
+         generation<-generation+1
+         if(generation-1<ncol(ped)){
+            Uped<-unique(ped[,c(generation-1,generation)])
+            for(parent in unique(Uped[,1])){
+                SUped<-Uped[Uped[,1]==parent,]
+                childnumber<-nrow(SUped)
+                parentGenotype<-genotype[genotype[,1]==paste0(generation-1,"_",parent),2]
+                childGenotype<-sample(0:parentGenotype,childnumber,replace=T)
+                resultTmp<-data.frame(ID=paste0(generation,"_",SUped[,2]),genotype=childGenotype)
+                genotype<-unique(rbind(genotype,resultTmp))
+            }
+            coSeg(ped,generation,genotype)
+         }else{
+            return(genotype)
+         }
+}
