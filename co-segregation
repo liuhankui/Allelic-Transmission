@@ -1,4 +1,4 @@
-coSegregation<-function(ped,generation,genotype,maf){
+AllelicTransmission<-function(ped,generation,genotype,maf){
          generation<-generation+1
          if(generation-1<ncol(ped)){
             Uped<-unique(ped[,c(generation-1,generation)])
