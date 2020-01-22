@@ -1,26 +1,129 @@
-AllelicTransmission<-function(ped,generation,genotype,maf){
-         generation<-generation+1
-         if(generation-1<ncol(ped)){
-            Uped<-unique(ped[,c(generation-1,generation)])
-            for(parent in unique(Uped[,1])){
-                SUped<-Uped[Uped[,1]==parent,]
-                childnumber<-nrow(SUped)
-                parentGenotype<-as.numeric(genotype[genotype[,1]==paste0(generation-1,"_",parent),c(2,3)])
-                parentMatingGenotype<-as.numeric(genotype[genotype[,1]==paste0(generation-1,"_",parent,"_mating"),c(2,3)])
-                childAllele1<-sample(parentGenotype,childnumber,replace=T)
-                childAllele2<-sample(parentMatingGenotype,childnumber,replace=T)
-                resultTmp<-data.frame(ID=paste0(generation,"_",SUped[,2]),
-                                      allele1=childAllele1,
-                                      allele2=childAllele2)
-                childMatingAllele1<-sample(c(0,1),childnumber,replace=T,prob=c(1-maf,maf))
-                childMatingAllele2<-sample(c(0,1),childnumber,replace=T,prob=c(1-maf,maf))
-                resultMatingTmp<-data.frame(ID=paste0(generation,"_",SUped[,2],"_mating"),
-                                            allele1=childMatingAllele1,
-                                            allele2=childMatingAllele2)
-                genotype<-unique(rbind(genotype,resultTmp,resultMatingTmp))
+#example of Ped
+
+#1   1   1   1   1
+#1   1   1   2   2
+#1   1   2   3   3
+#1   1   3   4   4
+#1   1   4   5   5
+#1   2   5   6   NA
+#1   2   6   NA  NA
+
+#each column refer to each generation from first generation to last generation
+#each row refer to each child of last generation and his/her parent of every generation who borned in the famlily
+#NA refer to the parent still not hava any child
+#the mating individual who came outside of the family do not include in the ped file
+
+#allelic transmission model
+#usage：alleleFlow(ped,,,)
+alleleFlow<-function(ped,generation=1,genotype=NULL,prioriMaf=0.01){
+         #set the heterozygote genotype of ancestor who was affected
+         #and simulate the genotype of mating individual of affected ancestor
+         if(generation==1){
+            genotype<-data.frame(ID=paste0(generation,"_",unique(ped[,generation])),
+                                 allele1=0,
+                                 allele2=1
+                                 )
+            genotype<-rbind(genotype,
+                            data.frame(ID=paste0(generation,"_",unique(ped[,generation]),"_mating"),
+                                       allele1=sample(c(0,1),1,replace=T,prob=c(1-prioriMaf,prioriMaf)),
+                                       allele2=sample(c(0,1),1,replace=T,prob=c(1-prioriMaf,prioriMaf))
+                                       )
+                            )
+         }
+         if(generation<ncol(ped)){
+            #subset the ped file with generation and its next generation
+            pedSubset<-unique(ped[,c(generation,generation+1)])
+            pedSubset<-pedSubset[rowSums(is.na(pedSubset))==0,]
+            for(parent in unique(pedSubset[,1])){
+                #subset the ped file of each one parent and his/her all children
+                pedSingleFamily<-pedSubset[pedSubset[,1]==parent,]
+                childNumber<-nrow(pedSingleFamily)
+                parentOriginGenotype<-as.numeric(genotype[genotype[,1]==paste0(generation,"_",parent),c(2,3)])
+                parentMatingGenotype<-as.numeric(genotype[genotype[,1]==paste0(generation,"_",parent,"_mating"),c(2,3)])
+                #generate the gamete for each child from father and mother randomly
+                childAllele1<-sample(parentOriginGenotype,childNumber,replace=T)
+                childAllele2<-sample(parentMatingGenotype,childNumber,replace=T)
+                genetypeChild<-data.frame(ID=paste0(generation+1,"_",pedSingleFamily[,2]),
+                                          allele1=childAllele1,
+                                          allele2=childAllele2
+                                          )
+                #simulate the genotype of mating individual of each child
+                childMatingAllele1<-sample(c(0,1),childNumber,replace=T,prob=c(1-prioriMaf,prioriMaf))
+                childMatingAllele2<-sample(c(0,1),childNumber,replace=T,prob=c(1-prioriMaf,prioriMaf))
+                genotypeChildMating<-data.frame(ID=paste0(generation+1,"_",pedSingleFamily[,2],"_mating"),
+                                                allele1=childMatingAllele1,
+                                                allele2=childMatingAllele2
+                                                )
+                genotype<-unique(rbind(genotype,genetypeChild,genotypeChildMating))
             }
-            coSeg(ped,generation,genotype,maf)
+            #recursion
+            alleleFlow(ped,generation+1,genotype,prioriMaf)
          }else{
-            return(genotype)
+            phaseGT<-paste0(genotype[,2],"|",genotype[,3])
+            names(phaseGT)<-paste0("G",genotype[,1])
+            return(phaseGT)
          }
 }
+
+#ped file of affected and unaffected members of 90-member family
+#1 1 1 1
+#1 1 1 3
+#1 1 1 5
+#1 1 1 6
+#1 1 1 7
+#1 1 2 10
+#1 1 2 11
+#1 1 2 12
+#1 1 3 13
+#1 1 3 15
+#1 1 5 18
+#1 2 6 25
+#1 2 7 26
+#1 2 9 28
+#generate the ped file described above
+
+familyPed<-data.frame(x1=rep(1,14),x2=c(rep(1,11),rep(2,3)),
+                      x3=c(1,1,1,1,1,2,2,2,3,3,5,6,7,9),
+                      x4=c(1,3,5,6,7,10,11,12,13,15,18,25,26,28))
+#estimate the rate of exponential distribution which used to simulate minor allele frequency of rare mutation in ExAC database
+#library(MASS)
+#ACAN<-read.table("ExAC.MAF.0.01.xls",sep=" ")
+#fit<-fitdistr(log10(ACAN[,1]/ACAN[,2])+5,"exponential")
+
+#simulationNumber<-10000 #Test
+simulationNumber<-100000000
+
+#simulate minor allele frequency
+Mdf<-data.frame(Marker=seq(simulationNumber),
+                Maf=10^(rexp(simulationNumber,rate=2.4334081815)-5)#fit$estimate=2.4334081815
+                )
+Mdf$Maf[Mdf$Maf>0.01]<-0.01
+
+Gdf<-data.frame(t(apply(Mdf,1,function(x){alleleFlow(familyPed,,,x[2])})),stringsAsFactors=F)
+write.table(cbind(Mdf,Gdf),file="genotype.xls",sep="\t",quote=F,row.names=F,col.names=T)
+
+
+caseWGS<-c("G3_7","G4_5","G4_12","G4_15")
+controlWGS<-c("G3_5","G3_9","G4_1")
+caseSanger<-c("G3_6","G3_7","G4_3","G4_5","G4_10","G4_11","G4_12","G4_13","G4_15")
+controlSanger<-c("G3_5","G3_9","G4_1","G4_6","G4_7","G4_18","G4_25")
+
+caseWGSCol<-names(Gdf) %in% caseWGS
+controlWGSCol<-names(Gdf) %in% controlWGS
+caseSangerCol<-names(Gdf) %in% caseSanger
+controlSangerCol<-names(Gdf) %in% controlSanger
+
+Cdf<-data.frame(Method=c("WGS","Sanger"),
+                cases=c(sum(caseWGSCol),sum(caseSangerCol)),
+                controls=c(sum(controlWGSCol),sum(controlSangerCol)),
+                iterations=c(simulationNumber,simulationNumber)
+                )
+
+Cdf$coSegregations<-rowSums(data.frame(apply(Gdf,1,function(x){
+                             coSegregationWGS<-sum(grepl(1,x[caseWGSCol]))==sum(caseWGSCol) & sum(grepl(1,x[controlWGSCol]))==0;
+                             coSegregationSanger<-sum(grepl(1,x[caseSangerCol]))==sum(caseSangerCol) & sum(grepl(1,x[controlSangerCol]))==0;
+                             return(c(coSegregationWGS,coSegregationSanger))
+                            })))
+Cdf$probability=Cdf$coSegregations/Cdf$iterations
+
+write.table(Cdf,file="coSegregation.xls",sep="\t",quote=F,row.names=F,col.names=T)
