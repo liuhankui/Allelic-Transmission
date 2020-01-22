@@ -1,4 +1,4 @@
-#example of Ped
+#example of Ped (data.frame)
 
 #1   1   1   1   1
 #1   1   1   2   2
@@ -65,7 +65,7 @@ alleleFlow<-function(ped,generation=1,genotype=NULL,prioriMaf=0.01){
          }
 }
 
-#ped file of affected and unaffected members of 90-member family
+#ped file of 9 affected and 7 unaffected members in a 90-member family
 #1 1 1 1
 #1 1 1 3
 #1 1 1 5
@@ -81,28 +81,28 @@ alleleFlow<-function(ped,generation=1,genotype=NULL,prioriMaf=0.01){
 #1 2 7 26
 #1 2 9 28
 #generate the ped file described above
-
 familyPed<-data.frame(x1=rep(1,14),x2=c(rep(1,11),rep(2,3)),
                       x3=c(1,1,1,1,1,2,2,2,3,3,5,6,7,9),
                       x4=c(1,3,5,6,7,10,11,12,13,15,18,25,26,28))
+                      
 #estimate the rate of exponential distribution which used to simulate minor allele frequency of rare mutation in ExAC database
 #library(MASS)
 #ACAN<-read.table("ExAC.MAF.0.01.xls",sep=" ")
 #fit<-fitdistr(log10(ACAN[,1]/ACAN[,2])+5,"exponential")
 
-#simulationNumber<-10000 #Test
-simulationNumber<-100000000
+simulationNumber<-10000 #Test
+#simulationNumber<-100000000 
 
-#simulate minor allele frequency
+#simulate minor allele frequency of rare mutation
 Mdf<-data.frame(Marker=seq(simulationNumber),
                 Maf=10^(rexp(simulationNumber,rate=2.4334081815)-5)#fit$estimate=2.4334081815
                 )
 Mdf$Maf[Mdf$Maf>0.01]<-0.01
-
+#Genotype data.frame
 Gdf<-data.frame(t(apply(Mdf,1,function(x){alleleFlow(familyPed,,,x[2])})),stringsAsFactors=F)
 write.table(cbind(Mdf,Gdf),file="genotype.xls",sep="\t",quote=F,row.names=F,col.names=T)
 
-
+#ID of affected members and unaffected members
 caseWGS<-c("G3_7","G4_5","G4_12","G4_15")
 controlWGS<-c("G3_5","G3_9","G4_1")
 caseSanger<-c("G3_6","G3_7","G4_3","G4_5","G4_10","G4_11","G4_12","G4_13","G4_15")
@@ -113,6 +113,7 @@ controlWGSCol<-names(Gdf) %in% controlWGS
 caseSangerCol<-names(Gdf) %in% caseSanger
 controlSangerCol<-names(Gdf) %in% controlSanger
 
+#Co-segregation data.frame
 Cdf<-data.frame(Method=c("WGS","Sanger"),
                 cases=c(sum(caseWGSCol),sum(caseSangerCol)),
                 controls=c(sum(controlWGSCol),sum(controlSangerCol)),
